@@ -4,6 +4,7 @@ from typing import List, Literal
 import firebase_admin
 from firebase_admin import credentials, db
 from dotenv import load_dotenv
+import time
 import os
 
 load_dotenv()
@@ -63,7 +64,6 @@ def init_sensor(meta: SensorMetadata):
 # === 2. Time-Series Data Upload (Batch for Multiple Filters and Sensors) ===
 class SingleReading(BaseModel):
     sensor_id: str
-    timestamp: str
     value: str
 
 class FilterReadings(BaseModel):
@@ -77,10 +77,11 @@ class BatchSensorUpload(BaseModel):
 # === Background Task Function ===
 def process_sensor_data_batch(data: BatchSensorUpload):
     update_data = {}
+    current_time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())  # Getting the current time
 
     for filter_data in data.filters:
         for reading in filter_data.readings:
-            key_path = f"{data.user_id}/{filter_data.filter_type}/{reading.sensor_id}/readings/{reading.timestamp}"
+            key_path = f"{data.user_id}/{filter_data.filter_type}/{reading.sensor_id}/readings/{current_time_stamp}"
             update_data[key_path] = reading.value
 
     root_ref = db.reference("users")
