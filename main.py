@@ -38,6 +38,29 @@ FilterType = Literal[
     "alkaline_filter", "carbon_filter", "pre_filter", "ro_filter", "sediment_filter"
 ]
 
+
+
+# === 1. Sensor Metadata Setup ===
+class SensorMetadata(BaseModel):
+    user_id: str
+    filter_type: FilterType
+    sensor_id: str
+    sensor_name: str
+
+@app.post("/init_sensor/")
+def init_sensor(meta: SensorMetadata):
+    try:
+        path = f"users/{meta.user_id}/{meta.filter_type}/{meta.sensor_id}"
+        ref = db.reference(path)
+        ref.set({
+            "sensor_name": meta.sensor_name,
+            "readings": {}
+        })
+        return {"message": "Sensor initialized successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# === 2. Time-Series Data Upload (Batch for Multiple Filters and Sensors) ===
 class SingleReading(BaseModel):
     sensor_id: str
     timestamp: str
