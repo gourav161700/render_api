@@ -36,7 +36,7 @@ app = FastAPI()
 
 # === Models ===
 FilterType = Literal[
-    "alkaline_filter", "carbon_filter", "pre_filter", "ro_filter", "sediment_filter"
+    "pre_filter", "sediment_filter", "carbon_filter", "ro_filter", "motor", "alkaline_filter",
 ]
 
 
