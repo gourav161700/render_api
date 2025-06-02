@@ -6,6 +6,8 @@ from firebase_admin import credentials, db
 from dotenv import load_dotenv
 import time
 import os
+import pytz
+from datetime import datetime
 
 load_dotenv()
 
@@ -77,7 +79,10 @@ class BatchSensorUpload(BaseModel):
 # === Background Task Function ===
 def process_sensor_data_batch(data: BatchSensorUpload):
     update_data = {}
-    current_time_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())  # Getting the current time
+
+    # Set time zone
+    ist = pytz.timezone('Asia/Kolkata') # Setting the indian time zone
+    current_time_stamp = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")  # Getting the current time
 
     for filter_data in data.filters:
         for reading in filter_data.readings:
@@ -95,3 +100,42 @@ def upload_batch_sensor_values(data: BatchSensorUpload, background_tasks: Backgr
         return {"message": "Batch upload started in background."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Added deleting data of last 12 hours logic
+@app.delete("/delete_last_12_hours/")
+def delete_last_12_hours(user_id: str):
+    try:
+        ist = ZoneInfo("Asia/Kolkata")
+        now = datetime.now(ist)
+        twelve_hours_ago = now - timedelta(hours=12)
+
+        user_ref = db.reference(f"users/{user_id}")
+        user_data = user_ref.get()
+
+        if not user_data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        for filter_type, sensors in user_data.items():
+            for sensor_id, sensor_info in sensors.items():
+                readings_ref = db.reference(f"users/{user_id}/{filter_type}/{sensor_id}/readings")
+                readings = sensor_info.get("readings", {})
+
+                for timestamp_str in list(readings.keys()):
+                    try:
+                        # Parse timestamp
+                        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ist)
+                        if now - timestamp <= timedelta(hours=12):
+                            # Reading is within 12 hours; DELETE it
+                            readings_ref.child(timestamp_str).delete()
+                    except ValueError:
+                        # Skip malformed timestamps
+                        continue
+
+        return {"message": "Readings from the last 12 hours deleted successfully."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Request you have to made like : DELETE /delete_last_12_hours/?user_id=user123
